@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Query System</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+            background-color: #111;  /* Black background */
+            color: #f4f4f9;  /* Light text color for contrast */
+        }
+
+        h1 {
+            text-align: center;
+            color: #ff6347;  /* Tomato color for heading */
+            margin-bottom: 40px;
+        }
+
+        form {
+            margin-bottom: 20px;
+            display: flex;
+            flex-direction: column;
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+            background-color: #222;  /* Dark background for forms */
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+        }
+
+        form label {
+            font-size: 18px;
+            margin-bottom: 10px;
+            color: #f4f4f9;
+        }
+
+        form input[type="text"],
+        form input[type="file"] {
+            padding: 12px;
+            margin-bottom: 20px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background-color: #333;
+            color: #f4f4f9;
+            font-size: 16px;
+        }
+
+        form input[type="file"] {
+            display: none;  /* Hide the default file input */
+        }
+
+        form label[for="file"] {
+            background-color: #ff6347;  /* Orange box for "Choose file" */
+            color: white;
+            padding: 12px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            text-align: center;
+            font-size: 16px;
+        }
+
+        form button {
+            background-color: #ff6347;
+            color: white;
+            padding: 12px 20px;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            font-size: 16px;
+            align-self: flex-start;
+            margin-top: 10px;
+        }
+
+        form button:hover {
+            background-color: #e55347;  /* Darker shade on hover */
+        }
+
+        #result {
+            margin-top: 20px;
+            padding: 15px;
+            border: 1px solid #333;
+            border-radius: 5px;
+            background-color: #222;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+            max-width: 600px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        #answer {
+            font-size: 18px;
+            line-height: 1.6;
+        }
+
+        #image-container img {
+            max-width: 300px;
+            margin: 10px 0;
+            display: block;
+            border-radius: 5px;
+            box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+        }
+
+        #image-container {
+            text-align: center;
+        }
+
+        #file-name {
+            font-size: 16px;
+            color: #f4f4f9;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        input[type="text"]:focus, input[type="file"]:focus {
+            border-color: #ff6347;
+            outline: none;
+        }
+
+        .alert {
+            background-color: #ffcc00;
+            color: black;
+            padding: 10px;
+            border-radius: 5px;
+            margin-top: 20px;
+            text-align: center;
+        }
+
+        #loading {
+            display: none;
+            font-size: 18px;
+            text-align: center;
+            margin-top: 20px;
+            color: #ff6347;
+        }
+    </style>
+</head>
+<body>
+    <h1>Document Query-Bot</h1>
+
+    <!-- File Upload Form -->
+    <form id="uploadForm" enctype="multipart/form-data">
+        <input type="file" id="file" name="file" accept=".pdf" required>
+        <label for="file">Choose a PDF file...</label>  <!-- Custom button for file input -->
+        <div id="file-name"></div>  <!-- Container to display file name -->
+        <button type="submit">Upload</button>
+    </form>
+
+    <!-- Query Form -->
+    <form id="queryForm">
+        <label for="query">Ask a question:</label>
+        <input type="text" id="query" name="query" required>
+        <button type="submit">Submit</button>
+    </form>
+
+    <!-- Loading Indicator -->
+    <div id="loading">Please wait...</div>
+
+    <!-- Result Section -->
+    <div id="result" style="display: none;">
+        <h2>Answer:</h2>
+        <p id="answer"></p>
+        <div id="image-container"></div>
+    </div>
+
+    <!-- JavaScript -->
+    <script>
+        // Display file name when selected
+        document.getElementById("file").addEventListener("change", function () {
+            const fileName = this.files[0] ? this.files[0].name : "No file chosen";
+            document.getElementById("file-name").textContent = `Selected file: ${fileName}`;
+        });
+
+        async function showLoading(action) {
+            const loadingDiv = document.getElementById("loading");
+            if (action === "start") {
+                loadingDiv.style.display = "block";
+            } else if (action === "stop") {
+                loadingDiv.style.display = "none";
+            }
+        }
+
+        document.getElementById("uploadForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
+            showLoading("start");
+            const formData = new FormData();
+            const fileInput = document.getElementById("file");
+            formData.append("file", fileInput.files[0]);
+
+            try {
+                const response = await fetch("/upload", {
+                    method: "POST",
+                    body: formData
+                });
+
+                const result = await response.json();
+                if (response.ok) {
+                    alert("File uploaded and processed successfully. You can now ask questions!");
+                } else {
+                    alert(result.error || "An error occurred during file upload.");
+                }
+            } catch (error) {
+                console.error("Error uploading file:", error);
+                alert("An error occurred while uploading the file.");
+            } finally {
+                showLoading("stop");
+            }
+        });
+
+        document.getElementById("queryForm").addEventListener("submit", async function (e) {
+            e.preventDefault();
+            showLoading("start");
+            const query = document.getElementById("query").value;
+
+            try {
+                const response = await fetch("/query", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json"
+                    },
+                    body: JSON.stringify({ query: query })
+                });
+
+                const result = await response.json();
+                const resultDiv = document.getElementById("result");
+                const answerDiv = document.getElementById("answer");
+                const imageContainer = document.getElementById("image-container");
+
+                if (response.ok) {
+                    answerDiv.textContent = result.answer;
+                    imageContainer.innerHTML = result.html_image || "";
+                    resultDiv.style.display = "block";
+                } else {
+                    alert(result.error || "An error occurred during query processing.");
+                }
+            } catch (error) {
+                console.error("Error querying:", error);
+                alert("An error occurred while querying.");
+            } finally {
+                showLoading("stop");
+            }
+        });
+    </script>
+</body>
+</html>
