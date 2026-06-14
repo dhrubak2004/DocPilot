@@ -62,7 +62,9 @@ def handle_upload():
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
         print("File Uploaded!")
-
+        import shutil
+        shutil.rmtree('./raw_elements')
+        os.makedirs('./raw_elements', exist_ok=True)
         raw_element = partition_pdf(
             filename=file_path,
             strategy="fast",
