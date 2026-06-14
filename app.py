@@ -90,13 +90,23 @@ def handle_upload():
         prompt_text = "Summarize this text concisely: {element}"
         text_prompt = ChatPromptTemplate.from_template(prompt_text)
         text_chain = text_prompt | model | StrOutputParser()
-        text_summary = [text_chain.invoke({"element": t}) for t in Text]
+        if Text:
+            combined_text = "\n\n".join(Text)
+            text_summary = [text_chain.invoke({"element": combined_text})]
+            Text = [combined_text]
+        else:
+            text_summary = []
         print("Text summarized!")
 
         prompt_table = "Summarize this table concisely: {element}"
         table_prompt = ChatPromptTemplate.from_template(prompt_table)
         table_chain = table_prompt | model | StrOutputParser()
-        table_summary = [table_chain.invoke({"element": t}) for t in Table]
+        if Table:
+            combined_table = "\n\n".join(Table)
+            table_summary = [table_chain.invoke({"element": combined_table})]
+            Table = [combined_table]
+        else:
+            table_summary = []
         print("Tables summarized!")
 
         image_base64_list = []
