@@ -13,6 +13,7 @@ faiss-cpu
 unstructured
 pdf2image
 pdfminer.six==20231228
+pi-heif==0.21.0
 Pillow
 
 Werkzeug
