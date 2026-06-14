@@ -19,3 +19,5 @@ Pillow
 Werkzeug
 
 gunicorn
+
+unstructured-inference==0.8.1
