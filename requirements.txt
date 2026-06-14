@@ -10,14 +10,13 @@ openai
 
 faiss-cpu
 
-unstructured
+unstructured==0.16.11
+unstructured-inference==0.8.1
+
 pdf2image
 pdfminer.six==20231228
 pi-heif==0.21.0
 Pillow
 
 Werkzeug
-
 gunicorn
-
-unstructured-inference==0.8.1
