@@ -27,7 +27,7 @@ os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 # Configure upload folder and allowed extensions
 UPLOAD_FOLDER = './uploads'
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
+os.makedirs('./raw_elements', exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['ALLOWED_EXTENSIONS'] = {'pdf'}
 
@@ -137,8 +137,8 @@ def handle_upload():
             elif "unstructured.documents.elements.Table" in str(type(element)):
                 Table.append(str(element))
             elif "unstructured.documents.elements.Image" in str(type(element)):
-                Image.append(str(element))
-
+                Images.append(str(element))
+    
         # Summarization using OpenAI
         model = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
 
@@ -171,7 +171,7 @@ def handle_upload():
         def summarize_image(image_base64,prompt):
 
             #initiating gpt-4o for image summarisation
-            model=ChatOpenAI(temperature=0, model="gpt-4o")
+            model=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
 
             image_summarising_chain=model.invoke(
                 [
@@ -229,8 +229,7 @@ def handle_query():
 
     try:
         #using gpt-4 as a llm model
-        model=ChatOpenAI(temperature=0, model="gpt-4")
-
+        model=ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
         #prompt
         prompt_text="""
         You are a AI assistant.
