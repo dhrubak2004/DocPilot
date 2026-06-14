@@ -13,7 +13,7 @@ from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.messages import HumanMessage
 from PIL import Image
-from IPython.display import display, HTML
+# from IPython.display import display, HTML
 
 # Initialize Flask app
 app = Flask(__name__)
