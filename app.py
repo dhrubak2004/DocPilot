@@ -12,7 +12,7 @@ from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
 from langchain_openai import OpenAIEmbeddings
 from langchain_core.messages import HumanMessage
-from PIL import Image
+# from PIL import Image
 # from IPython.display import display, HTML
 
 # Initialize Flask app
@@ -122,7 +122,7 @@ def handle_upload():
         print("Elements are extracted!")
         
         Text=[]
-        Image=[]
+        Images=[]
         Table=[]
 
         for element in raw_element:
