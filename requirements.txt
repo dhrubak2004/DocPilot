@@ -18,3 +18,4 @@ tiktoken==0.8.0
 faiss-cpu==1.9.0.post1
 numpy==1.26.4
 langchain-groq
+sentence-transformers
