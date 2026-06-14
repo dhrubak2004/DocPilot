@@ -83,7 +83,7 @@ def handle_upload():
             elif "Image" in t:
                 Images.append(str(element))
 
-        model = ChatGroq(temperature=0, model="llama3-8b-8192")
+        model = ChatGroq(temperature=0, model="llama-3.3-70b-versatile")
 
         prompt_text = "Summarize this text concisely: {element}"
         text_prompt = ChatPromptTemplate.from_template(prompt_text)
@@ -126,7 +126,7 @@ def handle_query():
         return jsonify({"error": "Query is required"}), 400
 
     try:
-        model = ChatGroq(temperature=0, model="llama3-8b-8192")
+        model = ChatGroq(temperature=0, model="llama-3.3-70b-versatile")
         prompt_text = """
         You are an AI assistant.
         Answer the question based only on the following context:
