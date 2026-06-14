@@ -97,7 +97,8 @@ ndjson==0.3.1
 nest-asyncio==1.6.0
 networkx==3.4.2
 nltk==3.9.1
-numpy==2.0.2
+# numpy==2.0.2
+numpy==1.26.4
 olefile==0.47
 omegaconf==2.3.0
 onnx==1.17.0
