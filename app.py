@@ -67,7 +67,7 @@ def handle_upload():
         os.makedirs('./raw_elements', exist_ok=True)
         raw_element = partition_pdf(
             filename=file_path,
-            strategy="fast",
+            strategy="auto",
             extract_images_in_pdf=True,
             extract_image_block_types=["Image", "Table"],
             extract_image_block_to_payload=False,
