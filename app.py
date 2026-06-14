@@ -10,13 +10,12 @@ from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
-from langchain_openai import OpenAIEmbeddings
+from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.messages import HumanMessage
 
 app = Flask(__name__)
 load_dotenv()
 
-os.environ["OPENAI_API_KEY"] = os.getenv("OPENAI_API_KEY")
 os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
@@ -108,7 +107,7 @@ def handle_upload():
         print("Images processed!")
 
         document = create_document(Text, text_summary, image_base64_list, image_summaries, Table, table_summary)
-        db = FAISS.from_documents(documents=document, embedding=OpenAIEmbeddings())
+        db = FAISS.from_documents(documents=document, embedding=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"))
         print("Vectorstore created!")
 
         return jsonify({"message": "File uploaded and processed successfully. Ready for questions!"})
