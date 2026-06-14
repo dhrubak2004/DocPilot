@@ -140,7 +140,7 @@ def handle_upload():
                 Image.append(str(element))
 
         # Summarization using OpenAI
-        model = ChatOpenAI(temperature=0, model="gpt-4")
+        model = ChatOpenAI(temperature=0, model="gpt-3.5-turbo")
 
         # Summarize text
         #creating prompt
