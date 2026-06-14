@@ -112,7 +112,7 @@ def handle_upload():
         # Partition PDF
         raw_element = partition_pdf(
             filename=file_path,
-            strategy="hi_res",
+            strategy="fast",
             extract_images_in_pdf=True,
             extract_image_block_types=["Image", "Table"],
             extract_image_block_to_payload=False,
