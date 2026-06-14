@@ -76,7 +76,7 @@ def handle_upload():
         Text, Images, Table = [], [], []
         for element in raw_element:
             t = str(type(element))
-            if "Text" in t or "NarrativeText" in t or "ListItem" in t or "FigureCaption" in t:
+            if "Text" in t or "NarrativeText" in t or "ListItem" in t or "FigureCaption" in t or "Title" in t:
                 Text.append(str(element))
             elif "Table" in t:
                 Table.append(str(element))
@@ -150,7 +150,6 @@ def handle_query():
 
         answer = chain.invoke({"context": context, "question": query})
 
-        
         html_image = ""
         if relevant_images:
             for image_base64 in relevant_images:
