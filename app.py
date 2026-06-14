@@ -150,6 +150,7 @@ def handle_query():
 
         answer = chain.invoke({"context": context, "question": query})
 
+        
         html_image = ""
         if relevant_images:
             for image_base64 in relevant_images:
