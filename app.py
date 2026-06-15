@@ -1,6 +1,7 @@
 import os
 import uuid
 import base64
+import shutil
 from flask import Flask, request, jsonify, render_template
 from werkzeug.utils import secure_filename
 from unstructured.partition.pdf import partition_pdf
@@ -11,8 +12,6 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
-from langchain_core.messages import HumanMessage
-import shutil
 
 app = Flask(__name__)
 load_dotenv()
@@ -29,16 +28,22 @@ app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['ALLOWED_EXTENSIONS'] = {'pdf'}
 
 db = None
+progress = {"step": 0, "message": ""}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
+def set_progress(step, message):
+    global progress
+    progress["step"] = step
+    progress["message"] = message
+    print(message)
+
 def is_scanned_pdf(file_path):
-    """Check if PDF is scanned (image-based) or text-based"""
     try:
         elements = partition_pdf(filename=file_path, strategy="fast")
         text_elements = [e for e in elements if "Image" not in str(type(e))]
-        return len(text_elements) < 3  # if very few text elements, likely scanned
+        return len(text_elements) < 3
     except:
         return True
 
@@ -59,6 +64,10 @@ def create_document(text, text_summary, image_base64_list, image_summary, table,
 def upload_file():
     return render_template('upload.html')
 
+@app.route('/progress')
+def get_progress():
+    return jsonify(progress)
+
 @app.route('/upload', methods=['POST'])
 def handle_upload():
     global db
@@ -70,19 +79,17 @@ def handle_upload():
         return jsonify({"error": "No selected file"}), 400
 
     if file and allowed_file(file.filename):
+        set_progress(1, "Uploading file...")
         filename = secure_filename(file.filename)
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
-        print("File Uploaded!")
 
         shutil.rmtree('./raw_elements')
         os.makedirs('./raw_elements', exist_ok=True)
 
-        # Auto-detect scanned vs text PDF
+        set_progress(2, "Extracting content from PDF...")
         scanned = is_scanned_pdf(file_path)
         strategy = "ocr_only" if scanned else "fast"
-        print(f"Using strategy: {strategy}")
-
         raw_element = partition_pdf(
             filename=file_path,
             strategy=strategy,
@@ -91,7 +98,6 @@ def handle_upload():
             extract_image_block_to_payload=False,
             extract_image_block_output_dir="./raw_elements"
         )
-        print("Elements extracted!")
 
         Text, Images, Table = [], [], []
         for element in raw_element:
@@ -103,6 +109,7 @@ def handle_upload():
             elif "Image" in t:
                 Images.append(str(element))
 
+        set_progress(3, "Summarizing content with AI...")
         model = ChatGroq(temperature=0, model="llama-3.3-70b-versatile")
 
         prompt_text = "Summarize this text concisely: {element}"
@@ -110,22 +117,30 @@ def handle_upload():
         text_chain = text_prompt | model | StrOutputParser()
         if Text:
             combined_text = "\n\n".join(Text)
-            text_summary = [text_chain.invoke({"element": combined_text})]
+            try:
+                text_summary = [text_chain.invoke({"element": combined_text})]
+            except Exception:
+                import time
+                time.sleep(60)
+                text_summary = [text_chain.invoke({"element": combined_text})]
             Text = [combined_text]
         else:
             text_summary = []
-        print("Text summarized!")
 
         prompt_table = "Summarize this table concisely: {element}"
         table_prompt = ChatPromptTemplate.from_template(prompt_table)
         table_chain = table_prompt | model | StrOutputParser()
         if Table:
             combined_table = "\n\n".join(Table)
-            table_summary = [table_chain.invoke({"element": combined_table})]
+            try:
+                table_summary = [table_chain.invoke({"element": combined_table})]
+            except Exception:
+                import time
+                time.sleep(60)
+                table_summary = [table_chain.invoke({"element": combined_table})]
             Table = [combined_table]
         else:
             table_summary = []
-        print("Tables summarized!")
 
         image_base64_list = []
         image_summaries = []
@@ -134,13 +149,13 @@ def handle_upload():
                 with open(os.path.join("raw_elements", img_path), "rb") as f:
                     image_base64_list.append(base64.b64encode(f.read()).decode("utf-8"))
                 image_summaries.append("Image extracted from document.")
-        print("Images processed!")
 
+        set_progress(4, "Building vector store...")
         document = create_document(Text, text_summary, image_base64_list, image_summaries, Table, table_summary)
         db = FAISS.from_documents(documents=document, embedding=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"))
-        print("Vectorstore created!")
 
-        return jsonify({"message": f"File uploaded and processed successfully using {'OCR' if scanned else 'fast'} extraction. Ready for questions!"})
+        set_progress(5, "Done!")
+        return jsonify({"message": f"File processed successfully using {'OCR' if scanned else 'fast'} extraction. Ready for questions!"})
 
     return jsonify({"error": "Invalid file type"}), 400
 
