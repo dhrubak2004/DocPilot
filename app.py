@@ -12,11 +12,14 @@ from langchain_core.documents import Document
 from langchain_community.vectorstores import FAISS
 from langchain_community.embeddings import HuggingFaceEmbeddings
 from langchain_core.messages import HumanMessage
+import shutil
 
 app = Flask(__name__)
 load_dotenv()
 
-os.environ["GROQ_API_KEY"] = os.getenv("GROQ_API_KEY")
+groq_key = os.getenv("GROQ_API_KEY")
+if groq_key:
+    os.environ["GROQ_API_KEY"] = groq_key
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 UPLOAD_FOLDER = './uploads'
@@ -29,6 +32,15 @@ db = None
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
+def is_scanned_pdf(file_path):
+    """Check if PDF is scanned (image-based) or text-based"""
+    try:
+        elements = partition_pdf(filename=file_path, strategy="fast")
+        text_elements = [e for e in elements if "Image" not in str(type(e))]
+        return len(text_elements) < 3  # if very few text elements, likely scanned
+    except:
+        return True
 
 def create_document(text, text_summary, image_base64_list, image_summary, table, table_summary):
     documents = []
@@ -62,12 +74,18 @@ def handle_upload():
         file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
         file.save(file_path)
         print("File Uploaded!")
-        import shutil
+
         shutil.rmtree('./raw_elements')
         os.makedirs('./raw_elements', exist_ok=True)
+
+        # Auto-detect scanned vs text PDF
+        scanned = is_scanned_pdf(file_path)
+        strategy = "ocr_only" if scanned else "fast"
+        print(f"Using strategy: {strategy}")
+
         raw_element = partition_pdf(
             filename=file_path,
-            strategy="fast",
+            strategy=strategy,
             extract_images_in_pdf=True,
             extract_image_block_types=["Image", "Table"],
             extract_image_block_to_payload=False,
@@ -122,7 +140,7 @@ def handle_upload():
         db = FAISS.from_documents(documents=document, embedding=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"))
         print("Vectorstore created!")
 
-        return jsonify({"message": "File uploaded and processed successfully. Ready for questions!"})
+        return jsonify({"message": f"File uploaded and processed successfully using {'OCR' if scanned else 'fast'} extraction. Ready for questions!"})
 
     return jsonify({"error": "Invalid file type"}), 400
 
