@@ -2,8 +2,8 @@ import os
 import uuid
 import base64
 import shutil
+import time
 from flask import Flask, request, jsonify, render_template, session
-from flask_session import Session
 from werkzeug.utils import secure_filename
 from unstructured.partition.pdf import partition_pdf
 from dotenv import load_dotenv
@@ -23,14 +23,11 @@ if groq_key:
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
 app.secret_key = os.getenv("SECRET_KEY", "docpilot-secret-key-2024")
-app.config["SESSION_TYPE"] = "filesystem"
-app.config["SESSION_FILE_DIR"] = "./flask_sessions"
-Session(app)
+app.config['MAX_CONTENT_LENGTH'] = 16 * 1024 * 1024  # 16MB max
 
 UPLOAD_FOLDER = './uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('./raw_elements', exist_ok=True)
-os.makedirs('./flask_sessions', exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['ALLOWED_EXTENSIONS'] = {'pdf'}
 
@@ -71,9 +68,16 @@ def create_document(text, text_summary, image_base64_list, image_summary, table,
         documents.append(doc)
     return documents
 
+def cleanup_old_users():
+    if len(user_dbs) > 50:
+        oldest = list(user_dbs.keys())[0]
+        del user_dbs[oldest]
+        if oldest in user_progress:
+            del user_progress[oldest]
+
 @app.route('/')
 def upload_file():
-    get_user_id()  # ensure session created
+    get_user_id()
     return render_template('upload.html')
 
 @app.route('/progress')
@@ -84,6 +88,10 @@ def get_progress():
 @app.route('/upload', methods=['POST'])
 def handle_upload():
     user_id = get_user_id()
+
+    # Prevent double upload
+    if user_progress.get(user_id, {}).get("step", 0) in [1, 2, 3, 4]:
+        return jsonify({"error": "A file is already being processed. Please wait."}), 400
 
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
@@ -129,6 +137,11 @@ def handle_upload():
             elif "Image" in t:
                 Images.append(str(element))
 
+        # Handle empty PDF
+        if not Text and not Table and not Images:
+            set_progress(user_id, 0, "")
+            return jsonify({"error": "No content could be extracted. PDF may be empty or password protected."}), 400
+
         set_progress(user_id, 3, "Summarizing content with AI...")
         model = ChatGroq(temperature=0, model="llama-3.3-70b-versatile")
 
@@ -138,7 +151,6 @@ def handle_upload():
             try:
                 text_summary = [text_chain.invoke({"element": combined_text})]
             except Exception:
-                import time
                 time.sleep(60)
                 text_summary = [text_chain.invoke({"element": combined_text})]
             Text = [combined_text]
@@ -151,7 +163,6 @@ def handle_upload():
             try:
                 table_summary = [table_chain.invoke({"element": combined_table})]
             except Exception:
-                import time
                 time.sleep(60)
                 table_summary = [table_chain.invoke({"element": combined_table})]
             Table = [combined_table]
@@ -172,6 +183,11 @@ def handle_upload():
             documents=document,
             embedding=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
         )
+
+        # Cleanup files and old users
+        shutil.rmtree(user_upload_dir, ignore_errors=True)
+        shutil.rmtree(user_raw_dir, ignore_errors=True)
+        cleanup_old_users()
 
         set_progress(user_id, 5, "Done!")
         return jsonify({"message": f"File processed successfully using {'OCR' if scanned else 'fast'} extraction. Ready for questions!"})
