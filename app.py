@@ -2,7 +2,8 @@ import os
 import uuid
 import base64
 import shutil
-from flask import Flask, request, jsonify, render_template
+from flask import Flask, request, jsonify, render_template, session
+from flask_session import Session
 from werkzeug.utils import secure_filename
 from unstructured.partition.pdf import partition_pdf
 from dotenv import load_dotenv
@@ -21,23 +22,33 @@ if groq_key:
     os.environ["GROQ_API_KEY"] = groq_key
 os.environ["KMP_DUPLICATE_LIB_OK"] = "TRUE"
 
+app.secret_key = os.getenv("SECRET_KEY", "docpilot-secret-key-2024")
+app.config["SESSION_TYPE"] = "filesystem"
+app.config["SESSION_FILE_DIR"] = "./flask_sessions"
+Session(app)
+
 UPLOAD_FOLDER = './uploads'
 os.makedirs(UPLOAD_FOLDER, exist_ok=True)
 os.makedirs('./raw_elements', exist_ok=True)
+os.makedirs('./flask_sessions', exist_ok=True)
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 app.config['ALLOWED_EXTENSIONS'] = {'pdf'}
 
-db = None
-progress = {"step": 0, "message": ""}
+# Per-user storage
+user_dbs = {}
+user_progress = {}
 
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
 
-def set_progress(step, message):
-    global progress
-    progress["step"] = step
-    progress["message"] = message
-    print(message)
+def get_user_id():
+    if "user_id" not in session:
+        session["user_id"] = str(uuid.uuid4())
+    return session["user_id"]
+
+def set_progress(user_id, step, message):
+    user_progress[user_id] = {"step": step, "message": message}
+    print(f"[{user_id[:8]}] {message}")
 
 def is_scanned_pdf(file_path):
     try:
@@ -62,15 +73,17 @@ def create_document(text, text_summary, image_base64_list, image_summary, table,
 
 @app.route('/')
 def upload_file():
+    get_user_id()  # ensure session created
     return render_template('upload.html')
 
 @app.route('/progress')
 def get_progress():
-    return jsonify(progress)
+    user_id = get_user_id()
+    return jsonify(user_progress.get(user_id, {"step": 0, "message": ""}))
 
 @app.route('/upload', methods=['POST'])
 def handle_upload():
-    global db
+    user_id = get_user_id()
 
     if 'file' not in request.files:
         return jsonify({"error": "No file part"}), 400
@@ -79,24 +92,31 @@ def handle_upload():
         return jsonify({"error": "No selected file"}), 400
 
     if file and allowed_file(file.filename):
-        set_progress(1, "Uploading file...")
+        set_progress(user_id, 1, "Uploading file...")
+
+        # Per-user folders
+        user_upload_dir = f"./uploads/{user_id}"
+        user_raw_dir = f"./raw_elements/{user_id}"
+        os.makedirs(user_upload_dir, exist_ok=True)
+        if os.path.exists(user_raw_dir):
+            shutil.rmtree(user_raw_dir)
+        os.makedirs(user_raw_dir, exist_ok=True)
+
         filename = secure_filename(file.filename)
-        file_path = os.path.join(app.config['UPLOAD_FOLDER'], filename)
+        file_path = os.path.join(user_upload_dir, filename)
         file.save(file_path)
 
-        shutil.rmtree('./raw_elements')
-        os.makedirs('./raw_elements', exist_ok=True)
-
-        set_progress(2, "Extracting content from PDF...")
+        set_progress(user_id, 2, "Extracting content from PDF...")
         scanned = is_scanned_pdf(file_path)
         strategy = "ocr_only" if scanned else "fast"
+
         raw_element = partition_pdf(
             filename=file_path,
             strategy=strategy,
             extract_images_in_pdf=True,
             extract_image_block_types=["Image", "Table"],
             extract_image_block_to_payload=False,
-            extract_image_block_output_dir="./raw_elements"
+            extract_image_block_output_dir=user_raw_dir
         )
 
         Text, Images, Table = [], [], []
@@ -109,12 +129,10 @@ def handle_upload():
             elif "Image" in t:
                 Images.append(str(element))
 
-        set_progress(3, "Summarizing content with AI...")
+        set_progress(user_id, 3, "Summarizing content with AI...")
         model = ChatGroq(temperature=0, model="llama-3.3-70b-versatile")
 
-        prompt_text = "Summarize this text concisely: {element}"
-        text_prompt = ChatPromptTemplate.from_template(prompt_text)
-        text_chain = text_prompt | model | StrOutputParser()
+        text_chain = ChatPromptTemplate.from_template("Summarize this text concisely: {element}") | model | StrOutputParser()
         if Text:
             combined_text = "\n\n".join(Text)
             try:
@@ -127,9 +145,7 @@ def handle_upload():
         else:
             text_summary = []
 
-        prompt_table = "Summarize this table concisely: {element}"
-        table_prompt = ChatPromptTemplate.from_template(prompt_table)
-        table_chain = table_prompt | model | StrOutputParser()
+        table_chain = ChatPromptTemplate.from_template("Summarize this table concisely: {element}") | model | StrOutputParser()
         if Table:
             combined_table = "\n\n".join(Table)
             try:
@@ -144,24 +160,29 @@ def handle_upload():
 
         image_base64_list = []
         image_summaries = []
-        for img_path in os.listdir("raw_elements"):
+        for img_path in os.listdir(user_raw_dir):
             if img_path.endswith(".jpg"):
-                with open(os.path.join("raw_elements", img_path), "rb") as f:
+                with open(os.path.join(user_raw_dir, img_path), "rb") as f:
                     image_base64_list.append(base64.b64encode(f.read()).decode("utf-8"))
                 image_summaries.append("Image extracted from document.")
 
-        set_progress(4, "Building vector store...")
+        set_progress(user_id, 4, "Building vector store...")
         document = create_document(Text, text_summary, image_base64_list, image_summaries, Table, table_summary)
-        db = FAISS.from_documents(documents=document, embedding=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2"))
+        user_dbs[user_id] = FAISS.from_documents(
+            documents=document,
+            embedding=HuggingFaceEmbeddings(model_name="all-MiniLM-L6-v2")
+        )
 
-        set_progress(5, "Done!")
+        set_progress(user_id, 5, "Done!")
         return jsonify({"message": f"File processed successfully using {'OCR' if scanned else 'fast'} extraction. Ready for questions!"})
 
     return jsonify({"error": "Invalid file type"}), 400
 
 @app.route('/query', methods=['POST'])
 def handle_query():
-    global db
+    user_id = get_user_id()
+    db = user_dbs.get(user_id)
+
     if not db:
         return jsonify({"error": "No document has been uploaded yet."}), 400
 
