@@ -63,6 +63,7 @@
         #file-name { font-size: 16px; color: #f4f4f9; margin-top: 10px; text-align: center; }
         input[type="text"]:focus { border-color: #ff6347; outline: none; }
 
+        /* Overlay */
         #loading-overlay {
             display: none;
             position: fixed; top: 0; left: 0;
@@ -72,52 +73,197 @@
             justify-content: center; align-items: center;
         }
         #loading-overlay.active { display: flex; }
+
+        /* Spinner */
         .spinner {
-            width: 60px; height: 60px;
-            border: 6px solid #333;
+            width: 64px; height: 64px;
+            border: 6px solid #2a2a2a;
             border-top: 6px solid #ff6347;
             border-radius: 50%;
-            animation: spin 1s linear infinite;
-            margin-bottom: 20px;
+            animation: spin 0.9s linear infinite;
+            margin-bottom: 24px;
         }
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        .loading-text { font-size: 20px; color: #ff6347; font-weight: bold; margin-bottom: 6px; }
-        .loading-subtext { font-size: 13px; color: #aaa; text-align: center; max-width: 320px; margin-bottom: 20px; }
-        .progress-steps { text-align: left; }
+
+        .loading-title {
+            font-size: 22px;
+            font-weight: bold;
+            color: #ff6347;
+            margin-bottom: 6px;
+        }
+        .loading-sub {
+            font-size: 13px;
+            color: #888;
+            margin-bottom: 28px;
+        }
+
+        /* Steps */
+        .progress-steps {
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+            min-width: 280px;
+        }
         .step {
-            font-size: 14px; color: #555;
-            margin: 8px 0; padding-left: 22px;
-            position: relative; transition: color 0.3s;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            font-size: 15px;
+            color: #444;
+            transition: color 0.4s ease;
         }
         .step.active { color: #ff6347; }
         .step.done { color: #4caf50; }
-        .step::before { content: "-"; position: absolute; left: 0; }
-        .step.active::before { content: ">"; color: #ff6347; }
-        .step.done::before { content: "v"; color: #4caf50; }
-        #timer { margin-top: 16px; font-size: 13px; color: #777; }
-        #live-status { margin-top: 10px; font-size: 13px; color: #aaa; font-style: italic; }
+
+        .step-icon {
+            width: 22px; height: 22px;
+            border-radius: 50%;
+            border: 2px solid #444;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 12px;
+            transition: all 0.4s ease;
+            flex-shrink: 0;
+        }
+        .step.active .step-icon {
+            border-color: #ff6347;
+            background: #ff6347;
+            color: white;
+        }
+        .step.done .step-icon {
+            border-color: #4caf50;
+            background: #4caf50;
+            color: white;
+        }
+
+        /* Connector line */
+        .step-connector {
+            width: 2px; height: 14px;
+            background: #2a2a2a;
+            margin-left: 10px;
+            transition: background 0.4s ease;
+        }
+        .step-connector.done { background: #4caf50; }
+
+        #timer {
+            margin-top: 22px;
+            font-size: 12px;
+            color: #555;
+        }
+
+        #live-status {
+            margin-top: 8px;
+            font-size: 12px;
+            color: #888;
+            font-style: italic;
+            min-height: 16px;
+        }
+
+        /* Success popup */
+        #success-popup {
+            display: none;
+            position: fixed; top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.88);
+            z-index: 10000;
+            justify-content: center; align-items: center;
+        }
+        #success-popup.active { display: flex; }
+        .popup-box {
+            background: #1e1e1e;
+            border: 1px solid #333;
+            border-radius: 12px;
+            padding: 36px 40px;
+            text-align: center;
+            max-width: 380px;
+            width: 90%;
+        }
+        .popup-check {
+            width: 56px; height: 56px;
+            background: #4caf50;
+            border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            margin: 0 auto 18px;
+            font-size: 26px;
+            color: white;
+            animation: popIn 0.4s ease;
+        }
+        @keyframes popIn {
+            0% { transform: scale(0); }
+            70% { transform: scale(1.15); }
+            100% { transform: scale(1); }
+        }
+        .popup-title {
+            font-size: 20px;
+            font-weight: bold;
+            color: #f4f4f9;
+            margin-bottom: 8px;
+        }
+        .popup-msg {
+            font-size: 14px;
+            color: #888;
+            margin-bottom: 24px;
+            line-height: 1.6;
+        }
+        .popup-btn {
+            background: #ff6347;
+            color: white;
+            border: none;
+            padding: 12px 32px;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            width: 100%;
+        }
+        .popup-btn:hover { background: #e55347; }
     </style>
 </head>
 <body>
     <h1>Document Query-Bot</h1>
 
+    <!-- Loading Overlay -->
     <div id="loading-overlay">
         <div class="spinner"></div>
-        <div class="loading-text" id="loading-title">Processing your PDF...</div>
-        <div class="loading-subtext">Please do not close this page.</div>
+        <div class="loading-title" id="loading-title">Processing your PDF...</div>
+        <div class="loading-sub">Please do not close this page.</div>
         <div class="progress-steps">
-            <div class="step" id="step1">Uploading file</div>
-            <div class="step" id="step2">Extracting content from PDF</div>
-            <div class="step" id="step3">Summarizing content with AI</div>
-            <div class="step" id="step4">Building vector store</div>
+            <div class="step" id="step1">
+                <div class="step-icon" id="icon1">1</div>
+                <span>Uploading file</span>
+            </div>
+            <div class="step-connector" id="conn1"></div>
+            <div class="step" id="step2">
+                <div class="step-icon" id="icon2">2</div>
+                <span>Extracting content from PDF</span>
+            </div>
+            <div class="step-connector" id="conn2"></div>
+            <div class="step" id="step3">
+                <div class="step-icon" id="icon3">3</div>
+                <span>Summarizing content with AI</span>
+            </div>
+            <div class="step-connector" id="conn3"></div>
+            <div class="step" id="step4">
+                <div class="step-icon" id="icon4">4</div>
+                <span>Building vector store</span>
+            </div>
         </div>
         <div id="timer">Elapsed: <span id="elapsed">0</span>s</div>
         <div id="live-status"></div>
     </div>
 
+    <!-- Success Popup -->
+    <div id="success-popup">
+        <div class="popup-box">
+            <div class="popup-check">&#10003;</div>
+            <div class="popup-title">Processing Complete</div>
+            <div class="popup-msg" id="popup-msg">Your document has been processed successfully. You can now ask questions.</div>
+            <button class="popup-btn" onclick="closePopup()">OK, Start Asking</button>
+        </div>
+    </div>
+
+    <!-- File Upload Form -->
     <form id="uploadForm" enctype="multipart/form-data">
         <input type="file" id="file" name="file" accept=".pdf" required>
         <label for="file">Choose a PDF file...</label>
@@ -125,12 +271,14 @@
         <button type="submit" id="uploadBtn">Upload</button>
     </form>
 
+    <!-- Query Form -->
     <form id="queryForm">
         <label for="query">Ask a question:</label>
         <input type="text" id="query" name="query" required>
         <button type="submit" id="queryBtn">Submit</button>
     </form>
 
+    <!-- Result Section -->
     <div id="result" style="display: none;">
         <h2>Answer:</h2>
         <p id="answer"></p>
@@ -141,7 +289,6 @@
         let timerInterval;
         let pollInterval;
         let elapsedSeconds = 0;
-        const steps = ["step1", "step2", "step3", "step4"];
 
         document.getElementById("file").addEventListener("change", function () {
             const fileName = this.files[0] ? this.files[0].name : "No file chosen";
@@ -153,7 +300,14 @@
             document.getElementById("loading-title").textContent = title;
             document.getElementById("elapsed").textContent = "0";
             document.getElementById("live-status").textContent = "";
-            steps.forEach(s => document.getElementById(s).className = "step");
+
+            // Reset all steps
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById("step" + i).className = "step";
+                document.getElementById("icon" + i).textContent = i;
+                if (i < 4) document.getElementById("conn" + i).className = "step-connector";
+            }
+
             document.getElementById("loading-overlay").classList.add("active");
 
             timerInterval = setInterval(() => {
@@ -169,29 +323,50 @@
                     const data = await res.json();
                     updateSteps(data.step, data.message);
                 } catch (e) {}
-            }, 1000);
+            }, 800);
         }
 
         function updateSteps(step, message) {
-            steps.forEach((s, i) => {
-                if (i + 1 < step) {
-                    document.getElementById(s).className = "step done";
-                } else if (i + 1 === step) {
-                    document.getElementById(s).className = "step active";
+            for (let i = 1; i <= 4; i++) {
+                const el = document.getElementById("step" + i);
+                const icon = document.getElementById("icon" + i);
+                if (i < step) {
+                    el.className = "step done";
+                    icon.textContent = "v";
+                    if (i < 4) document.getElementById("conn" + i).className = "step-connector done";
+                } else if (i === step) {
+                    el.className = "step active";
+                    icon.textContent = i;
                 } else {
-                    document.getElementById(s).className = "step";
+                    el.className = "step";
+                    icon.textContent = i;
                 }
-            });
+            }
             document.getElementById("live-status").textContent = message;
         }
 
-        function stopLoading() {
+        function stopLoading(successMsg) {
             clearInterval(timerInterval);
             clearInterval(pollInterval);
-            steps.forEach(s => document.getElementById(s).className = "step done");
+
+            // Mark all done
+            for (let i = 1; i <= 4; i++) {
+                document.getElementById("step" + i).className = "step done";
+                document.getElementById("icon" + i).textContent = "v";
+                if (i < 4) document.getElementById("conn" + i).className = "step-connector done";
+            }
+
             setTimeout(() => {
                 document.getElementById("loading-overlay").classList.remove("active");
+                if (successMsg) {
+                    document.getElementById("popup-msg").textContent = successMsg;
+                    document.getElementById("success-popup").classList.add("active");
+                }
             }, 600);
+        }
+
+        function closePopup() {
+            document.getElementById("success-popup").classList.remove("active");
         }
 
         document.getElementById("uploadForm").addEventListener("submit", async function (e) {
@@ -206,14 +381,19 @@
             try {
                 const response = await fetch("/upload", { method: "POST", body: formData });
                 const result = await response.json();
-                stopLoading();
+
                 if (response.ok) {
-                    alert(result.message || "File uploaded successfully. You can now ask questions!");
+                    stopLoading(result.message || "Document processed. You can now ask questions.");
                 } else {
+                    clearInterval(timerInterval);
+                    clearInterval(pollInterval);
+                    document.getElementById("loading-overlay").classList.remove("active");
                     alert(result.error || "An error occurred during file upload.");
                 }
             } catch (error) {
-                stopLoading();
+                clearInterval(timerInterval);
+                clearInterval(pollInterval);
+                document.getElementById("loading-overlay").classList.remove("active");
                 alert("An error occurred while uploading the file.");
             } finally {
                 document.getElementById("uploadBtn").disabled = false;
@@ -233,7 +413,10 @@
                     body: JSON.stringify({ query: query })
                 });
                 const result = await response.json();
-                stopLoading();
+
+                clearInterval(timerInterval);
+                document.getElementById("loading-overlay").classList.remove("active");
+
                 if (response.ok) {
                     document.getElementById("answer").textContent = result.answer;
                     document.getElementById("image-container").innerHTML = result.html_image || "";
@@ -242,7 +425,8 @@
                     alert(result.error || "An error occurred.");
                 }
             } catch (error) {
-                stopLoading();
+                clearInterval(timerInterval);
+                document.getElementById("loading-overlay").classList.remove("active");
                 alert("An error occurred while querying.");
             } finally {
                 document.getElementById("queryBtn").disabled = false;
